@@ -1,19 +1,31 @@
-import LearnModel as lm
+import LearningModel as lm
 import numpy as np
 import math
 class LeastSquare(lm.SupervisedLearningModel):
+	# X[:,0]: air speed, X[:,1]: pressure, X[:,2]: temperature, X[:,3]: angle of attack
+	# Y: weight
 	def _error(self,x,y,param):
-		r = y - np.dot(x,param)
+		r = y - self._eval(x,param)
 		se = np.dot(r.transpose(), r)
-		rmse = math.sqrt(se/x.shape[0])
+		rmse = math.sqrt(se/y.shape[0])
 		return {'RMSE': rmse, 'SE': se}
+
 	def _train(self,x,y):
-		q, r = np.linalg.qr(x)
-		b = np.dot(q.transpose(),y)
-		weight = np.linalg.lstsq(r[:3,:3],b[:3])
-		return weight[0]
+		W = y[:,0]; T = x[:,2]; P = x[:,1]; V = x[:,0]; AOA = x[:,3]
+		rho = P/1000/(0.2869*T)
+		Cl_estimated = 2*W/rho/np.power(V,2)/61.0
+		A = np.ones((AOA.shape[0],2))
+		A[:,0] = AOA
+		w = np.linalg.lstsq(A, Cl_estimated)[0]
+		return w
+
 	def _eval(self, x, param):
-		return np.dot(x, param)
+		T = x[:,2]; P = x[:,1]; V = x[:,0]; AOA = x[:,3]
+		rho = P/1000/(0.2869*T)
+		A = np.ones((AOA.shape[0],2))
+		A[:,0] = AOA
+		y = 0.5*np.dot(A,param)*rho*np.power(V,2)*61.0
+		return np.asmatrix(y).transpose()
 
 # special case of the linear transformation ( for this test... )
 class SpecialLinearTransformation(lm.DataTransformer):
@@ -31,3 +43,12 @@ class SpecialLinearTransformation(lm.DataTransformer):
 		A[:,1] = x1
 		A[:,2] = x2
 		return A
+
+class SpecialLinearTransformationP(lm.DataTransformer):
+	def setWeight(self, weight):
+		self.w = weight;
+	def _YTrans(self, Y):
+		r = np.array([Y[:,:].sum(axis=1) + self.w]).transpose()
+		return r
+	def _XTrans(self, X):
+		return X[:,:]

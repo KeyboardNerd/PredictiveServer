@@ -6,12 +6,15 @@ import math
 import sys
 import abc
 
-
+DEBUG = False
+DEBUG_FILE = "DEBUG.csv"
 class DataTransformer(object):
 	__metaclass__ = abc.ABCMeta
 	def __init__(self, XFields, YFields):
 		self.XFields = XFields
 		self.YFields = YFields
+		self.X = None
+		self.Y = None
 	def trans(self, database, start, end):
 		length = end - start
 		X = np.zeros((length, len(self.XFields)))
@@ -26,6 +29,7 @@ class DataTransformer(object):
 			Y[:,index] = np.array([database.select(f, start, end)])
 			index += 1
 		# by definition:
+		self.X = X; self.Y = Y
 		return (self._XTrans(X), self._YTrans(Y))
 	@abc.abstractmethod
 	def _YTrans(self, Y):
@@ -53,6 +57,10 @@ class SupervisedLearningModel(object):
 		else:
 			self.X = np.vstack((self.X, x))
 			self.Y = np.vstack((self.Y, y))
+		global DEBUG, DEBUG_FILE
+		if (DEBUG):
+			np.savetxt(DEBUG_FILE,self.X,delimiter=",")
+
 	def inSampleError(self, visual=False):
 		if visual:
 			self._visualize(self.X, self.Y, self.param)
@@ -76,12 +84,17 @@ class SupervisedLearningModel(object):
 		pass
 	def _visualize(self,X,Y,W):
 		eY = self._eval(X, W)
+		error = Y - eY
+		eY = (eY.transpose().tolist()[0])
+		Y = (Y.transpose().tolist()[0])
+		error = error.transpose().tolist()[0]
+		Y_len = len(Y); eY_len = len(eY); error_len = len(error)
 		f, graphs = plt.subplots(2)
 		graphs[0].set_title("blue is measured, red is estimated")
-		graphs[0].plot(np.linspace(0,Y.shape[0], Y.shape[0]), Y, color="blue")
-		graphs[0].plot(np.linspace(0,Y.shape[0], Y.shape[0]), eY, color="red")
+		graphs[0].plot(np.linspace(0,len(Y), Y_len), Y, color="blue")
+		graphs[0].plot(np.linspace(0,Y_len, Y_len), eY, color="red")
 		graphs[1].set_title("measured - estimated")
-		graphs[1].plot(np.linspace(0,Y.shape[0], Y.shape[0]), Y - eY, color="red")
+		graphs[1].plot(np.linspace(0,Y_len, Y_len), error, color="red")
 		f.subplots_adjust(hspace=0.5)
 		plt.show()
 

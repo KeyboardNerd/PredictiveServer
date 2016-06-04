@@ -15,18 +15,28 @@ class DataParser(object):
 		lines = map(lambda(string): string.replace('\n',''), f.readlines());
 		name = []
 		nameRead = False
+		endWithDeliminator = False;
 		for i in lines:
+			endWithDeliminator = (i[-1] == self.deliminator);
 			if (len(i) == 0):
 				continue
 			if not nameRead:
-				name = map(lambda(string): string.strip(), i.split(self.deliminator)[:-1])
+				if endWithDeliminator:
+					name = map(lambda(string): string.strip(), i.split(self.deliminator)[:-1])
+				else:
+					name = map(lambda(string): string.strip(), i.split(self.deliminator)[:])
 				nameRead = True
 				continue
-			current = map(float, map(lambda(string): string.strip(), i.split(self.deliminator)[:-1]))
+			if endWithDeliminator:
+				current = map(float, map(lambda(string): string.strip(), i.split(self.deliminator)[:-1]))
+			else:
+				current = map(float, map(lambda(string): string.strip(), i.split(self.deliminator)[:]))
 			if (len(current) != len(name)):
 				raise Exception("Error Name/Data mismatch" + str(current) + str(name))
 			for index in xrange(0,len(current)):
-				dataBase.insert(clusterName = name[index], data = current[index])
+				result = dataBase.insert(clusterName = name[index], data = current[index])
+				if (not result):
+					raise Exception("cluster name mistach:>" + name[index] +"<")
 		f.close()
 
 class DataBaseViewer(object):
@@ -125,6 +135,7 @@ class DataBase(object):
 		if self.ignoreCase:
 			clusterName = clusterName.lower()
 		return clusterName in self.clusters.keys()
+
 	def select(self, clusterName, start=None, end=None):
 		if self.ignoreCase:
 			clusterName = clusterName.lower()
@@ -137,7 +148,7 @@ class DataBase(object):
 				return self.db[self.clusters[clusterName].key][start : end]
 			elif start is None and end is None:
 				return self.db[self.clusters[clusterName].key][:]
-
+		raise Warning("NO DATA SELECTED: containing check: " + str(self.contains(clusterName)) + "request: ["+str(start)+","+str(end)+"]" + ",cluster length: " + str(self.clusterSize(clusterName))+", expected cluster name: " + clusterName + ",list of clusters: " + str(self.clusterNames()))
 		return []
 	def drop(self, clusterName):
 		# drop a cluster

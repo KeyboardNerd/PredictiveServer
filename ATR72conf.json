@@ -1,0 +1,27 @@
+{
+  "Unit Converter File":"unit.json",
+  "Training Data Files":[
+    {"name":"data/ATR72_training.csv", "deliminator": ",", "cruise phase": [[0,2038]]}
+  ],
+  "Training Data Inital Configuration":"ATR72init.json",
+  "Training Data Unit Conversion Configuration":"ATR72done.json",
+  "Training Data Visualization":true,
+  "Training Data Result Visualization": true,
+  "Testing Data Files":[
+    {"name":"data/ATR72_testing.csv", "deliminator":",", "cruise phase": [[0,226]]}
+  ],
+  "Testing Data Inital Configuration":"ATR72init.json",
+  "Testing Data Unit Conversion Configuration":"ATR72done.json",
+  "Testing Data Visualization": true,
+  "Testing Data Result Visualization": true,
+  "X Fields": ["speed", "pressure", "temperature","angle"],
+  "Y Fields": ["weight"],
+
+  "Automatic Cruise Phase": false,
+  "Cruise Phase Time Field": "time",
+  "Cruise Phase Speed Field": "true air speed",
+  "Cruise Phase Maximum Acceleration": 1,
+  "Cruise Phase Minimum Length Of Time": 0.1,
+  "Cruise Phase Minimum Speed": 10,
+  "Plane Empty Weight": 0
+}
