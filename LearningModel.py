@@ -5,7 +5,8 @@ import DataBase as db
 import math
 import sys
 import abc
-
+import matplotlib.patches as mpatches
+import matplotlib.pyplot as plt
 DEBUG = False
 DEBUG_FILE = "DEBUG.csv"
 class DataTransformer(object):
@@ -89,14 +90,16 @@ class SupervisedLearningModel(object):
 		Y = (Y.transpose().tolist()[0])
 		error = error.transpose().tolist()[0]
 		Y_len = len(Y); eY_len = len(eY); error_len = len(error)
-		f, graphs = plt.subplots(2)
-		graphs[0].set_title("blue is measured, red is estimated")
-		graphs[0].plot(np.linspace(0,len(Y), Y_len), Y, color="blue")
-		graphs[0].plot(np.linspace(0,Y_len, Y_len), eY, color="red")
-		graphs[1].set_title("measured - estimated")
-		graphs[1].plot(np.linspace(0,Y_len, Y_len), error, color="red")
-		f.subplots_adjust(hspace=0.5)
+
+		plt.plot(np.linspace(0,len(Y), Y_len), Y, color="blue",label="measured")
+		plt.plot(np.linspace(0,Y_len, Y_len), eY, color="red",label="estimated")
+		plt.yticks(np.arange(125000, 150000, 1000.0))
+		plt.legend();
+		plt.grid(True)
+		plt.ylabel("Weight (Newton)")
+		plt.xlabel("Elapsed time (Second)")
 		plt.show()
+
 
 
 # we only need part of the data to train the model

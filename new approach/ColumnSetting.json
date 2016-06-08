@@ -1,0 +1,6 @@
+{"columns": [{"type": "speed", "initName": "Vtrue_ktas", "unit": "knot"},
+             {"type": "pressure", "initName":"AMprs_inHG","unit":"inches of mercury"},
+             {"type":"temperature","initName":"AMtmp_degC","unit":"Celsius"},
+             {"type":"angle","initName":"alpha__deg","unit":"degree"},
+             {"type":"force","initName":"curnt___lb","unit":"pound"}
+            ]}

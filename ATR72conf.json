@@ -1,18 +1,18 @@
 {
   "Unit Converter File":"unit.json",
   "Training Data Files":[
-    {"name":"data/ATR72_training.csv", "deliminator": ",", "cruise phase": [[0,2038]]}
+    {"name":"data/thetrain.csv", "deliminator": ",", "cruise phase": [[0,1555]]}
   ],
   "Training Data Inital Configuration":"ATR72init.json",
   "Training Data Unit Conversion Configuration":"ATR72done.json",
-  "Training Data Visualization":true,
-  "Training Data Result Visualization": true,
+  "Training Data Visualization":false,
+  "Training Data Result Visualization": false,
   "Testing Data Files":[
-    {"name":"data/ATR72_testing.csv", "deliminator":",", "cruise phase": [[0,226]]}
+    {"name":"data/thetest.csv", "deliminator":",", "cruise phase": [[0,664]]}
   ],
   "Testing Data Inital Configuration":"ATR72init.json",
   "Testing Data Unit Conversion Configuration":"ATR72done.json",
-  "Testing Data Visualization": true,
+  "Testing Data Visualization": false,
   "Testing Data Result Visualization": true,
   "X Fields": ["speed", "pressure", "temperature","angle"],
   "Y Fields": ["weight"],

@@ -4,7 +4,9 @@ import math
 import sys
 import json
 import uuid
+import random
 import time
+import datetime
 import UnitConverter
 class DataParser(object):
 	def __init__(self, fileName, deliminator):
@@ -60,7 +62,38 @@ class DataBaseViewer(object):
 				index += 1
 		f.subplots_adjust(hspace=0.5)
 		plt.show()
-
+class DataWriter(object):
+	def __init__(self, dataBase):
+		self.dataBase = dataBase
+	def save(self,filename, randomWeight):
+		f = open(filename, 'w+')
+		A = np.zeros((self.dataBase.minClusterSize(),self.dataBase.numofClusters()))
+		i = 0
+		names = self.dataBase.clusterNames()
+		print names
+		currentline = "#"
+		weight_position = names.index("weight")
+		for n in names:
+			currentline += (n+",")
+			A[:,i] = np.array(self.dataBase.select(n))
+			i+=1
+		f.write(currentline[:-1]+"\n")
+		x = 0
+		start = int(math.floor(random.random()*(len(A)-50)))
+		print "random starts from: " + str(start)
+		for line in A:
+			currentline = ""
+			f.write(datetime.datetime.fromtimestamp(x).strftime(':%Y-%m-%d %H%M%S000-0400:'))
+			the_index = 0
+			for i in line:
+				if the_index == weight_position and randomWeight and x>=start and x < start+50:
+					print x, i
+					i += (random.random()-0.5)*20000 # add about 10% random number
+					print i
+				currentline += (str(i) + ",")
+				the_index += 1
+			f.write(currentline[:-1]+"\n")
+			x+=1
 class DataCluster(object):
 	def __init__(self, name, unit=None, type_=None, size=0, key=None):
 		if name is None:
@@ -210,8 +243,9 @@ class DataBase(object):
 		return min(map(lambda(x): self.clusters[x].size, self.clusters))
 if __name__ == '__main__':
 	x = time.time()
-	db = DataBase('initConfig.json', True)
+	db = DataBase('ATR72init.json', True)
 	viewer = DataBaseViewer(db)
-	db.addData(DataParser('../data/Low Power King Air.txt', '|'))
-	db.loadConfiguration('afterConfig.json', UnitConverter.UnitConverter('unit.json'))
-	viewer.visualize()
+	db.addData(DataParser('data/thetest.csv', ','))
+	db.loadConfiguration('ATR72done.json', UnitConverter.UnitConverter('unit.json'))
+	DataWriter(db).save('data/thetest.pltdata', False)
+	#viewer.visualize()

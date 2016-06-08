@@ -4,4 +4,4 @@
             {"key": 3, "type":"angle","name":"alpha__deg","unit":"degree"},
             {"key": 4, "type":"force","name":"curnt___lb","unit":"pound"}
             ]
-          }
+}

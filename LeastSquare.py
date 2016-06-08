@@ -17,7 +17,12 @@ class LeastSquare(lm.SupervisedLearningModel):
 		A = np.ones((AOA.shape[0],2))
 		A[:,0] = AOA
 		w = np.linalg.lstsq(A, Cl_estimated)[0]
-		return w
+		q, r = np.linalg.qr(A)
+		b = np.dot(q.transpose(),Cl_estimated)
+		weight = np.linalg.lstsq(r[:2,:2],b[:2])
+		np.savetxt("y.csv",Cl_estimated,delimiter=",")
+		np.savetxt("x.csv",A,delimiter=",")
+		return weight[0]
 
 	def _eval(self, x, param):
 		T = x[:,2]; P = x[:,1]; V = x[:,0]; AOA = x[:,3]

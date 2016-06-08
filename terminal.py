@@ -90,7 +90,8 @@ def main():
 		model.readData(tdata, p[0], p[1])
 	print "done\nTraining Data result:"
 	result = model.train()
-	print result
+	print "%.20f" % result[0]
+	print "%.20f" % result[1]
 	print "in sample error:"
 	print model.inSampleError(trainresultVisualization)
 	print "out sample error:"
