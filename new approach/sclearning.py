@@ -2,65 +2,76 @@ import numpy as np
 import sklearn as sk
 import sqlite3
 import csv
-import abc
 import time
 import datetime
-class FileParser(object):
-    __metaclass__ = abc.ABCMeta
+import ConfigParser
+class XPlaneFileParser(object):
+    DEBUG = False
     def __init__(self, dbName, tableName, unitConverter, configFileName):
         self.configFileName = configFileName
         self.dbName = dbName # file parser parse the csv file and store result into sqlite database by calling
         self.tableName = tableName
-        self.columns = []
         self.connection = None
         self.unitConverter = unitConverter
+        self.columnInfo = {}
+
     def connect(self):
         self.connection = sqlite3.connect(self.dbName)
+
     def close(self):
         self.connection.close()
-    @abc.abstractmethod
-    def parse(self, filename):
-        pass
 
-class XPlaneFileParser(FileParser):
-    def setColumnInfo(self, dictionary):
-        columns = getColumns()
-        for i in columns:
-            if i in dictionary:
-                t = (dictionary[i]["UNIT"], dictionary[i]["NAME"])
-                query = "UPDATE COL_INFO SET UNIT=" + t[0] +",NAME="+t[1]+" WHERE COL_IND=" + i
+    def loadConfig(self, filename):
+        conf = ConfigParser.ConfigParser()
+        conf.read(filename)
+        section = "name"
+        for option in conf.options(section):
+            self.columnInfo[option] = map(str.strip, conf.get(section, option).split("|"))
 
-    def getColumns():
+    def getColumns(self):
         cursor = self.connection.cursor()
         cursor.execute("PRAGMA table_info("+self.tableName+")")
         return map(lambda(t): t[1],cursor.fetchall())[1:]
 
+    def setColumnInfo():
+        # create column information
+        cursor = self.connection.cursor()
+        # check if table exists:
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND  name='COL_INFO'")
+        result = cursor.fetchall()
+        # if it's not created then:
+        if len(result) == 0:
+            # get column names:
+            cursor.execute("PRAGMA table_info("+self.tableName+")")
+            columns = map(lambda(t): t[1],cursor.fetchall())[1:]
+            t = map(lambda(c): (c,c), columns)
+            cursor.execute("CREATE TABLE IF NOT EXISTS COL_INFO (COL_IND TEXT PRIMARY KEY, UNIT TEXT, NAME TEXT)")
+            cursor.executemany("INSERT INTO COL_INFO values (?,null,?)", t)
+            self.connection.commit()
+
     def parse(self, filename, delimiter):
         reader = csv.reader(filter(lambda(x): bool(x.strip()), open(filename,"rU").readlines()), delimiter=delimiter)
         heading = next(reader)
-        header = []
-        append = False
-        r = ""
-        for i in xrange(len(heading)):
-            if i % 2 == 0 and i != 0:
-                header.append(r)
-                r = ""
-            r += heading[i].strip().replace("/","")
         createTableQuery = "CREATE TABLE IF NOT EXISTS " + self.tableName + " (ROWINDEX INTEGER PRIMARY KEY,"
-        for i in xrange(len(header)):
-            createTableQuery += ( header[i] + " DOUBLE")
-            if i != len(header) - 1:
+        for i in xrange(len(heading)):
+            if heading[i].strip(): # if the heading is not empty
+                createTableQuery += ( '['+heading[i].strip() + ']' + " DOUBLE")
                 createTableQuery += ","
         # read the csv file to database
         # set columns if it's not here
-        createTableQuery = createTableQuery + ")"
-        self.columns = header
+        createTableQuery = createTableQuery[:-1] + ")" # remove the last comma
+        if self.DEBUG:
+            print createTableQuery
         cursor = self.connection.cursor()
+        # create table if it's not here
         cursor.execute(createTableQuery)
         toInsert = []
         length = -1
+        # insert data
         for row in reader:
             result = map(float, map(str.strip, row[:-1]))
+            # apply unit converter TODO
+
             if length == -1:
                 length = len(result)
             if length != len(result):
@@ -74,21 +85,7 @@ class XPlaneFileParser(FileParser):
         query += ")"
         cursor.executemany(query, toInsert)
         self.connection.commit()
-        # create column information
-        cursor = self.connection.cursor()
-        # check if table exists:
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND  name='COL_INFO'")
-        result = cursor.fetchall()
-        # if it's not created then:
-        print result
-        if len(result) == 0:
-            # get column names:
-            cursor.execute("PRAGMA table_info("+self.tableName+")")
-            columns = map(lambda(t): t[1],cursor.fetchall())[1:]
-            t = map(lambda(c): (c,c), columns)
-            cursor.execute("CREATE TABLE IF NOT EXISTS COL_INFO (COL_IND TEXT PRIMARY KEY, UNIT TEXT, NAME TEXT)")
-            cursor.executemany("INSERT INTO COL_INFO values (?,null,?)", t)
-            self.connection.commit()
+
 
 class PILOTSFileWriter(object):
     """docstring for PILOTSDataWriter"""
@@ -116,7 +113,6 @@ class PILOTSFileWriter(object):
                 if (index != length - 1):
                     queryFields += ","
             if rowRange:
-                print rowRange
                 query = "SELECT "+timeColumnName+queryFields+" FROM "+self.dbTable+" WHERE ROWINDEX BETWEEN "+str(rowRange[0])+" AND "+str(rowRange[1])
             else:
                 query = "SELECT "+timeColumnName+queryFields+" FROM "+self.dbTable
@@ -136,20 +132,3 @@ class PILOTSFileWriter(object):
             resultFile.close()
         debug.close()
         connection.close()
-
-class Preprocessor(object):
-    def __init__(self, arg):
-        super(Preprocessor, self).__init__()
-        self.arg = arg
-
-class LearningModel(object):
-    """docstring for LearningModel"""
-    def __init__(self, arg):
-        super(LearningModel, self).__init__()
-        self.arg = arg
-
-class PostProcessor(object):
-    """docstring for PostProcessor"""
-    def __init__(self, arg):
-        super(PostProcessor, self).__init__()
-        self.arg = arg
