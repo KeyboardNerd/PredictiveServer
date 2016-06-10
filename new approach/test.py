@@ -1,68 +1,74 @@
 from sclearning import *
-import sys
-import sqlite3
-import time
-import datetime
-import sklearn.linear_model
-import matplotlib.pyplot as plt
-def TestParse():
-    # read XPlaneFile to database
-    XPlaneFileParser.DEBUG = True
-    parser = XPlaneFileParser("a.db","ATR72","converter", "conf.ini")
-    parser.connect()
-    parser.parse("zxcv.txt", "|")
-    parser.close()
+import numpy as np
+import os.path
 
-def testWrite():
-    # output to PILOTS format
-    writer = PILOTSFileWriter("a.db","ATR72")
-    writer.write(filenames = {"aktas.txt":["____A_ktas"], "all.txt":["___cltotal", "____A_ktas"]})
-
-# learning model
-def queryDataSet(dbNameFile, query):
-    con = sqlite3.connect(dbNameFile)
-    cursor = con.cursor()
-    cursor.execute(query)
-    units = []
-    return (np.matrix(cursor.fetchall()), units)
-def convertUnit(A, units):
-    A[:,4] *= 4.44822
-    A[:,3] = A[:,3]*0.0174533
-    A[:,2] = A[:,2]+273.15
-    A[:,1] = A[:,1]*3386.39
-    A[:,0] = A[:,0]*0.514444
-def makeTrainingData(A):
+def toX(A):
     N = np.ones((A[:,3].shape[0],2))
     N[:,0:1] = A[:,3]
     return N
-def makeTargetValue(A):
+
+def toY(A):
     W = A[:,4]
     V = A[:,0]
     P = A[:,1]
     T = A[:,2]
     N = 2*W/(P/1000/(0.2869*T))/np.power(V,2)/61.0
     return N
-def train(model, X,Y):
-    model.fit(X,Y)
-def predict(model, X):
-    return model.predict(X)
 
-# make training set
-query = "SELECT [Vtrue,_ktas],[AMprs,_inHG],[AMtmp,_degC],[alpha,__deg],[curnt,___lb] FROM ATR72 WHERE abs([curnt,___lb]-[_lift,___lb])/[curnt,___lb]<0.02 ORDER BY [_totl,_time] limit 1000 "
-A,units = queryDataSet("a.db", query)
-convertUnit(A,units)
-X = makeTrainingData(A)
-Y = makeTargetValue(A)
-model = sklearn.linear_model.LinearRegression()
-train(model, X,Y)
-Cl_predicted = predict(model, X)
-# predict weight:
-W = A[:,4]
-V = A[:,0]
-P = A[:,1]
-T = A[:,2]
-W_predicted = 0.5*np.multiply(np.multiply(Cl_predicted,(P/1000/(0.2869*T))),np.power(V,2))*61.0
-# show result
-plt.plot(np.linspace(0,W_predicted.shape[0],W_predicted.shape[0]), (W_predicted).tolist())
-plt.plot(np.linspace(0,W_predicted.shape[0],W_predicted.shape[0]), (W).tolist())
-plt.show()
+def transform(A):
+    V = A[:,0]
+    P = A[:,1]
+    T = A[:,2]
+    W = A[:,4]
+    return (W,V,P,T)
+
+def estimateW(A):
+    V = A[:,0]
+    P = A[:,1]
+    T = A[:,2]
+    W = A[:,4]
+    return 0.5*np.multiply(P/1000/(0.2869*T),np.power(V,2))*61.0
+
+def testDBRead():
+    db = ScDBController("a.db")
+    if not os.path.isfile("a.db"):
+        db.connect()
+        db.parse(parser=XPlaneFileParser(), fileName="xplane_sample.txt", delimiter="|", tableName="example")
+        db.setColumnInfo(tableName="example",fileName="conf.ini")
+        db.close()
+
+def testDBWrite():
+    db = ScDBController("a.db")
+    db.connect()
+    files = {"speed.txt":["true air speed", "ambient pressure"], "weight":["current weight"]}
+    name = {"true air speed":"speed", "ambient pressure":"pressure", "current weight":"weight"}
+    unit = {"true air speed":"m/s","ambient pressure":"pascal","current weight":"newton"}
+    time_col = "total time"
+    db.write(PILOTSFileWriter(files, name, unit), "example", " WHERE ROWINDEX BETWEEN 100 AND 200")
+
+def testLearning():
+    db = ScDBController("a.db")
+    proc = ScLearningPreprocessor()
+    cols = ["true air speed", "ambient pressure", "ambient temperature", "angle of attack", "current weight"]
+    constraint = "abs({b}-{a})/{b}<0.01"
+    constraintVar = {'a':"lift", 'b':"current weight"}
+    orderandlimit = "{a}"
+    orderandlimitVar = {'a':'total time'}
+    units = ["m/s","pascal","kelvin","radian","newton"]
+    proc.loadDataSet(db, "example", cols, constraint, constraintVar, orderandlimit, orderandlimitVar,units)
+    X = proc.makeTrainingData(toX)
+    Y = proc.makeTargetValue(toY)
+    model = sklearn.linear_model.LinearRegression()
+    model.fit(X,Y)
+    Cl_predicted = model.predict(X)
+    plt.plot(np.linspace(0,Y.shape[0],Y.shape[0]), (Cl_predicted - Y).tolist())
+    plt.show()
+    W_predicted = np.multiply(Cl_predicted, proc.execute(estimateW))
+    W = proc.execute(transform)[0]
+    plt.plot(np.linspace(0,Y.shape[0],Y.shape[0]), (W_predicted).tolist())
+    plt.plot(np.linspace(0,Y.shape[0],Y.shape[0]), (W).tolist())
+    plt.show()
+
+testDBRead()
+testDBWrite()
+testLearning()

@@ -49,7 +49,6 @@ class UnitConverter(object):
 	def listMeasure(self, unitName):
 		return map(lambda(y): self.unitList[y].measure, filter(lambda(key): unitName in key, self.unitList))
 	def convert(self, measure, fromName, toName, value):
-		x = time.time()
 		try:
 			unitA = self.unitList[measure+fromName]
 			unitB = self.unitList[measure+toName]
@@ -61,9 +60,7 @@ class UnitConverter(object):
 				a = -unitB.co
 			else:
 				a = [1.0/unitB.co[1], float(-unitB.co[0])/unitB.co[1]]
-			x = time.time()
 			result = np.polyval(a, result)
-
 			return result
 		except KeyError as e:
 			print "[Error] requested unit is missing" + str(e)
