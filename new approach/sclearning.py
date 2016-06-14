@@ -78,7 +78,7 @@ class ScDBController(object):
         writer.write(self, tableName, constraint)
     def setColumnInfo(self, tableName, fileName):
         # set column information
-        cursor = connection.cursor()
+        cursor = self.connection.cursor()
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND  name='COL_INFO'")
         result = cursor.fetchall()
         # create table if it's not here
@@ -91,7 +91,7 @@ class ScDBController(object):
             pass
         result = self._readConf(fileName,tableName)
         cursor.executemany("INSERT INTO COL_INFO values (?,?,?,?,?)",result)
-        connection.commit()
+        self.connection.commit()
     def queryColumnInfoByName(self,name, distinctCheck=False):
         cursor = self.connection.cursor()
         query = "SELECT COLUMN, NAME, UNIT, TYPE FROM COL_INFO WHERE NAME='%s'"%name;
@@ -136,18 +136,20 @@ class ScDBController(object):
         return result
 
 
-class XPlaneFileParser(object):
+class ScDBParser(object):
     DEBUG = False
     def __init__(self):
         self.connection = None
-
+        self.parser = None
+    def setParserFunction(self, function):
+        self.parser = function
     def parse(self, fileName, delimiter, tableName, dbName, externalConnection=None):
         if externalConnection != None:
             connection = externalConnection
         else:
             connection = sqlite3.connect(dbName)
-        reader = csv.reader(filter(lambda(x): bool(x.strip()), open(fileName,"rU").readlines()), delimiter=delimiter)
-        heading = next(reader)
+
+        heading, toInsert, rowLength = self.parser(fileName, delimiter)
         cursor = connection.cursor()
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND  name=\"%s\""%(tableName))
         if len(cursor.fetchall()) == 0: # if there's no table named <tableName>
@@ -162,24 +164,17 @@ class XPlaneFileParser(object):
                 print createTableQuery
             cursor.execute(createTableQuery)
         # insert data:
-        toInsert = []
-        length = -1
-        for row in reader:
-            result = map(float, map(str.strip, row[:-1]))
-            if length == -1:
-                length = len(result)
-            elif length != len(result):
-                raise Exception("data is not filled")
-            toInsert.append(result)
         query = "insert into " + tableName + " values (null,"
-        for i in xrange(length):
+        for i in xrange(rowLength):
             query += "?,"
         query = query[:-1] + ")"
         cursor.executemany(query, toInsert)
         connection.commit()
         if externalConnection == None:
             connection.close()
+    
 
+    
 class PILOTSFileWriter(object):
     """docstring for PILOTSDataWriter"""
     DEBUG = False

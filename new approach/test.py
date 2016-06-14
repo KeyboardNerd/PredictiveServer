@@ -2,6 +2,20 @@ from sclearning import *
 import numpy as np
 import os.path
 
+def XPlaneFileParser(fileName, delimiter):
+    reader = csv.reader(filter(lambda(x): bool(x.strip()), open(fileName,"rU").readlines()), delimiter=delimiter)
+    heading = next(reader)
+    data = []
+    length = -1
+    for row in reader:
+        result = map(float, map(str.strip, row[:-1]))
+        if length == -1:
+            length = len(result)
+        elif length != len(result):
+            raise Exception("data is not filled")
+        data.append(result)
+    return (heading, data, length)
+
 def toX(A):
     N = np.ones((A[:,3].shape[0],2))
     N[:,0:1] = A[:,3]
