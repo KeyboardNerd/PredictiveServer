@@ -138,9 +138,9 @@ class ScDBController(object):
 
 class ScDBParser(object):
     DEBUG = False
-    def __init__(self):
+    def __init__(self, parser=None):
         self.connection = None
-        self.parser = None
+        self.parser = parser
     def setParserFunction(self, function):
         self.parser = function
     def parse(self, fileName, delimiter, tableName, dbName, externalConnection=None):
