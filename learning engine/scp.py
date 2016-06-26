@@ -15,7 +15,7 @@ class LearnWrapper():
         self.p.load(ScDBController(DBNAME), obj, values, constraint_formula, constraint_vars, size)
         self.l.fit(self.p.feature, self.p.label)
     def predict(self, point):
-        return self.l.predict(point)
+        return self.l.predict(np.matrix(point))
 
 # first support single instance of learning model running
 def is_number(string):
@@ -101,18 +101,30 @@ def parse(json_string):
         values = parse_training_query(json_dict['DATA'])
         constraint = parse_equation(json_dict['CONSTRAINT'])
         size = json_dict['size']        
-        print constraint, size, values, obj_name
         pipeline.fit( obj_name, values, constraint[0], constraint[1], size)
         
     elif json_dict['MODE'] == 2:
         pipeline = INSTANCE[json_dict['ID']]
         #print pipeline.predict(parse_predict_equation(json_dict["VALUES"]))
-        print pipeline.predict(json_dict["VALUES"])
+        return pipeline.predict(json_dict["VALUES"])
 
 def register_model(name, model):
     global MODELS
     MODELS[name] = model    
 
+def histo_plot( data):
+    import matplotlib.pyplot as plt
+    import matplotlib.mlab as mlab
+    import matplotlib
+    from scipy.stats import norm
+    from matplotlib.legend_handler import HandlerLine2D
+    (mu, sigma) = norm.fit(data)
+    # the histogram of the data
+    n, bins, patches = plt.hist(data, 30, normed=1, facecolor='green', alpha=0.75)
+
+    # add a 'best fit' line
+    y = mlab.normpdf( bins, mu, sigma)
+    l = plt.plot(bins, y, 'r--', linewidth=2)
 if __name__ == '__main__':
     register_model("My regression 1", LinearRegression())
     register_model("Bayesian", GaussianNB())
@@ -123,9 +135,11 @@ if __name__ == '__main__':
     parse(model_define_string)
     parse(training_string_db)
     parse(predict_string)
-    model_define_string2 = '{"MODE": 0, "ID":0, "MODEL":"My regression 1", "FEATURE":["{b}/{a}"], "LABEL":"{c}"}'
-    training_string_db2 = '{"MODE": 1, "ID": 0, "OBJECT":"bayes", "size":3000,"DATA":"b=b,  a=a, c=c","CONSTRAINT": ""}'
-    predict_string2 = '{"MODE": 2, "ID": 0, "VALUES":[1,2]}'
+    model_define_string2 = '{"MODE": 0, "ID":1, "MODEL":"Bayesian", "FEATURE":["{b}/{a}"], "LABEL":"{c}"}'
+    training_string_db2 = '{"MODE": 1, "ID": 1, "OBJECT":"bayes", "size":3000,"DATA":"b=b,  a=a, c=c","CONSTRAINT": ""}'
+    predict_string2 = '{"MODE": 2, "ID": 1, "VALUES":[2]}'
     parse(model_define_string2)
     parse(training_string_db2)
-    parse(predict_string)
+    parse(predict_string2)
+
+#    query.append(json.dumps({'MODE':2, 'ID':1, 'VALUES':X1}))

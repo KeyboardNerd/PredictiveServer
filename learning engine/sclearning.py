@@ -88,7 +88,6 @@ class LearnPreprocessor():
                     one_feature[i] = requested_values[i]['value']
                 else:
                     one_feature[i] = 'self.dataset[:,%d]'%self.cols[requested_values[i]['value']]                
-            print one_feature
             self.feature[:,one_feature_index] = eval(self.feature_equation[one_feature_index].format(**one_feature)) # it's dangerous to do this, use ast manipulation to revise this later
         # make label
         for i in self.label_var:
