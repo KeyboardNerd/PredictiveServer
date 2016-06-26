@@ -21,3 +21,4 @@ TODO:
 1. simplify code to support more complex learning libraries and distributed frameworks like hadoop
 2. test more complex learning models
 3. support streaming data
+4. use pickle to serialize learning model algorithms
