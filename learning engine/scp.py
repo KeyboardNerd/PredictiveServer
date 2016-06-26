@@ -2,6 +2,7 @@ import compiler
 import json
 from sclearning import *
 from sklearn.linear_model import LinearRegression
+from sklearn.naive_bayes import GaussianNB
 MODELS = {}
 INSTANCE = {}
 DBNAME = 'b.db'
@@ -13,7 +14,6 @@ class LearnWrapper():
     def fit(self, obj, values, constraint_formula, constraint_vars, size):
         self.p.load(ScDBController(DBNAME), obj, values, constraint_formula, constraint_vars, size)
         self.l.fit(self.p.feature, self.p.label)
-        print self.l.coef_, self.l.intercept_
     def predict(self, point):
         return self.l.predict(point)
 
@@ -38,9 +38,14 @@ def parse_equation(string):
     variable_dict = {}
     for i in variables:
         pair = map(lambda(x): x.strip(), i.split('='))
-        value, unit = map(lambda(x): x.strip(), pair[1].split('('))
+        value_unit = map(lambda(x): x.strip(), pair[1].split('('))
+        if (len(value_unit) == 1):
+            value = value_unit[0]
+            unit = ""
+        elif len(value_unit) == 2:
+            value = value_unit[0]
+            unit = value_unit[1][:-1]
         isnumber = is_number(value)
-        unit = unit[:-1]
         variable_dict[pair[0].strip()] = {'value': value, 'unit': unit, 'isnumber': isnumber}
     return (formula, variable_dict)
     
@@ -65,11 +70,16 @@ def parse_predict_equation(string):
 def parse_training_query(string):
     pairs = map(lambda(x):x.split('='), string.split(','))
     result = {}
-    for i in pairs:
-        value, unit = i[1].split('(')
-        unit = unit[:-1]
+    for pair in pairs:
+        value_unit = map(lambda(x): x.strip(), pair[1].split('('))
+        if (len(value_unit) == 1):
+            value = value_unit[0]
+            unit = ""
+        elif len(value_unit) == 2:
+            value = value_unit[0]
+            unit = value_unit[1][:-1]
         isnumber = is_number(value)
-        result[i[0].strip()] = {'unit': unit, 'value': value, 'isnumber': isnumber}
+        result[pair[0].strip()] = {'unit': unit, 'value': value, 'isnumber': isnumber}
     return result
 
 
@@ -91,6 +101,7 @@ def parse(json_string):
         values = parse_training_query(json_dict['DATA'])
         constraint = parse_equation(json_dict['CONSTRAINT'])
         size = json_dict['size']        
+        print constraint, size, values, obj_name
         pipeline.fit( obj_name, values, constraint[0], constraint[1], size)
         
     elif json_dict['MODE'] == 2:
@@ -100,13 +111,21 @@ def parse(json_string):
 
 def register_model(name, model):
     global MODELS
-    MODELS[name] = model
+    MODELS[name] = model    
 
-register_model("My regression 1", LinearRegression())
-# every instance of learning model can only have one model, feature and label definition
-model_define_string = '{"MODE": 0, "ID":0, "MODEL":"My regression 1", "FEATURE":["{aoa}"], "LABEL":"2*{W}/({V}**2*{S}*(4.174794718087996e-11*(288.14-0.00649*{H})**4.256))"}'
-training_string_db = '{"MODE": 1, "ID": 0, "OBJECT":"example", "size":1000,"DATA":"aoa=angle of attack(radian),  W=current weight(N), V=true air speed(m/s), S=61.0(m^2), H=altitude msl(m)","CONSTRAINT": "abs({b}-{a})/{a}<0.01, b=lift(N), a = current weight(N)"}'
-predict_string = '{"MODE": 2, "ID": 0, "VALUES":[0.02234021]}'
-parse(model_define_string)
-parse(training_string_db)
-parse(predict_string)
+if __name__ == '__main__':
+    register_model("My regression 1", LinearRegression())
+    register_model("Bayesian", GaussianNB())
+    # every instance of learning model can only have one model, feature and label definition
+    model_define_string = '{"MODE": 0, "ID":0, "MODEL":"My regression 1", "FEATURE":["{aoa}"], "LABEL":"2*{W}/({V}**2*{S}*(4.174794718087996e-11*(288.14-0.00649*{H})**4.256))"}'
+    training_string_db = '{"MODE": 1, "ID": 0, "OBJECT":"example", "size":1000,"DATA":"aoa=angle of attack(radian),  W=current weight(N), V=true air speed(m/s), S=61.0(m^2), H=altitude msl(m)","CONSTRAINT": "abs({b}-{a})/{a}<0.01, b=lift(N), a = current weight(N)"}'
+    predict_string = '{"MODE": 2, "ID": 0, "VALUES":[0.02234021]}'
+    parse(model_define_string)
+    parse(training_string_db)
+    parse(predict_string)
+    model_define_string2 = '{"MODE": 0, "ID":0, "MODEL":"My regression 1", "FEATURE":["{b}/{a}"], "LABEL":"{c}"}'
+    training_string_db2 = '{"MODE": 1, "ID": 0, "OBJECT":"bayes", "size":3000,"DATA":"b=b,  a=a, c=c","CONSTRAINT": ""}'
+    predict_string2 = '{"MODE": 2, "ID": 0, "VALUES":[1,2]}'
+    parse(model_define_string2)
+    parse(training_string_db2)
+    parse(predict_string)

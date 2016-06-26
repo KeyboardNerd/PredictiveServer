@@ -51,6 +51,7 @@ class LearnPreprocessor():
         self.label_equation = equation
         for i in self.regex.findall(equation):
             self.label_var[i[1:-1]] = ""
+    
     def load(self, database, table, requested_values, constraint_formula, constraint_values, size):
         database.connect()
         col_names = []
@@ -72,7 +73,7 @@ class LearnPreprocessor():
                 col_names.append(info[0])
                 item['value'] = info[0]
             constraint_pairs[i] = '"' + item['value'] + '"'
-        data = np.array(database.queryDataByConstraintAndOrder(table, col_names, "%s limit %d"%(constraint_formula.format(**constraint_pairs), size)))
+        data = np.array(database.queryDataByConstraintAndOrder(table, col_names, "%s"%(constraint_formula.format(**constraint_pairs)), None, limit=size))
         database.close()
         unitConvert(data, col_units, requested_units)
         for i in xrange(len(col_names)):
@@ -86,9 +87,9 @@ class LearnPreprocessor():
                 if requested_values[i]['isnumber']:
                     one_feature[i] = requested_values[i]['value']
                 else:
-                    one_feature[i] = 'self.dataset[:,%d]'%self.cols[requested_values[i]['value']]
-                print self.feature_equation[one_feature_index].format(**one_feature)
-                self.feature[:,one_feature_index] = eval(self.feature_equation[one_feature_index].format(**one_feature)) # it's dangerous to do this, use ast manipulation to revise this later
+                    one_feature[i] = 'self.dataset[:,%d]'%self.cols[requested_values[i]['value']]                
+            print one_feature
+            self.feature[:,one_feature_index] = eval(self.feature_equation[one_feature_index].format(**one_feature)) # it's dangerous to do this, use ast manipulation to revise this later
         # make label
         for i in self.label_var:
             if requested_values[i]['isnumber']:
@@ -96,70 +97,8 @@ class LearnPreprocessor():
             else:
                 self.label_var[i] = 'self.dataset[:,%d]'%self.cols[requested_values[i]['value']]
         self.label = eval(self.label_equation.format(**self.label_var)) # it's dangerous to do this, use ast manipulation to revise this later
-        plt.scatter(self.feature, self.label)
-        plt.show()
         np.savetxt("feature.csv",self.feature, delimiter=',')
         np.savetxt("label.csv",self.label, delimiter=',')
-    def loadDataSet(self, database, tableName, columnNames,constraint, constraintColumnNames, order, orderColumnNames, outputUnits):
-        database.connect()
-        qcol = []
-        wherecol = {}
-        ordercol = {}
-        units = []
-        for i in columnNames:
-            result = database.queryColumnInfoByName(i, True)
-            qcol.append(result[0][0])
-            units.append(result[0][2])
-        for i in constraintColumnNames:
-            wherecol[i] = '"'+(database.queryColumnInfoByName(constraintColumnNames[i],True)[0][0])+'"'
-        for i in orderColumnNames:
-            ordercol[i] = '"'+(database.queryColumnInfoByName(orderColumnNames[i],True)[0][0])+'"'
-        A = np.matrix(database.queryDataByConstraintAndOrder(tableName ,qcol, constraint.format(**wherecol), order.format(**ordercol)))
-        for i in xrange(len(qcol)):
-            self.cols[qcol[i]] = i
-        unitConvert(A, units, outputUnits)
-        self.dataSet = A
-        database.close()
-        return self.dataSet
-
-class ScLearningPreprocessor():
-    def __init__(self):
-        self.training = None
-        self.target = None
-        self.dataSet = None
-        self.cols = None
-    def loadDataSet(self, database, tableName, columnNames,constraint, constraintColumnNames, order, orderColumnNames, outputUnits):
-        database.connect()
-        qcol = []
-        wherecol = {}
-        ordercol = {}
-        units = []
-        for i in columnNames:
-            result = database.queryColumnInfoByName(i, True)
-            qcol.append(result[0][0])
-            units.append(result[0][2])
-        for i in constraintColumnNames:
-            wherecol[i] = '"'+(database.queryColumnInfoByName(constraintColumnNames[i],True)[0][0])+'"'
-        for i in orderColumnNames:
-            ordercol[i] = '"'+(database.queryColumnInfoByName(orderColumnNames[i],True)[0][0])+'"'
-        A = np.matrix(database.queryDataByConstraintAndOrder(tableName ,qcol, constraint.format(**wherecol), order.format(**ordercol)))
-        for i in xrange(len(qcol)):
-            self.cols[qcol[i]] = i
-        unitConvert(A, units, outputUnits)
-        self.dataSet = A
-        database.close()
-        return self.dataSet
-    
-    def makeTrainingData(self, transformationLambda):
-        self.training = transformationLambda(self.dataSet)
-        return self.training
-
-    def makeTargetValue(self, transformationLambda):
-        self.target = transformationLambda(self.dataSet)
-        return self.target
-    
-    def execute(self, transformationLambda):
-        return transformationLambda(self.dataSet)
 
 class ScDBController(object):
     DEBUG = False
@@ -170,6 +109,8 @@ class ScDBController(object):
         self.connection = sqlite3.connect(self.dbName)
     def close(self):
         self.connection.close()
+    def parse_with_line_function(self, filename, table, function, title=None, title_parse=None):
+        f = open(filename)
     def parse(self, parser, fileName, delimiter, tableName):
         parser.parse(fileName, delimiter, tableName, self.dbName, self.connection)
     def write(self, writer, tableName, constraint):
@@ -207,7 +148,7 @@ class ScDBController(object):
         result = self.connection.cursor().execute(q)
         self.connection.commit()
         return result
-    def queryDataByConstraintAndOrder(self, table, columns, constraint=None, order=None):
+    def queryDataByConstraintAndOrder(self, table, columns, constraint=None, order=None, limit=None):
         if type(columns) is list:
             select = ""
             for i in columns:
@@ -220,8 +161,10 @@ class ScDBController(object):
         if (constraint):
             w = 'WHERE %s '%(constraint)
         if (order):
-            o = 'ORDER BY %s'%(order)
-        query = s + f + w + o
+            o = 'ORDER BY %s '%(order)
+        if (limit):
+            l = 'limit %d '%limit
+        query = s + f + w + o + l
         if self.DEBUG:
             print query
         result = None
