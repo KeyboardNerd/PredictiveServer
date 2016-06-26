@@ -29,6 +29,7 @@ def csvFileParser(fileName, delimiter):
             raise Exception("data is not filled")
         data.append(result)
     return (heading, data, length)
+
 def PILOTSFileParser(fileName, delimiter):
     # example file parser without considering time
     reader = filter(lambda(x): bool(x.strip()), open(fileName,"rU").readlines())
@@ -49,8 +50,7 @@ def PILOTSFileParser(fileName, delimiter):
     return (heading, data, length)
 
 def toX(A):
-    N = np.ones((A[:,2].shape[0],2))
-    N[:,0:1] = A[:,2]
+    N = A[:,2]
     return N
 
 def toY(A):
@@ -87,59 +87,37 @@ def testDBWrite():
     time_col = "total time"
     db.write(PILOTSFileWriter(files, name, unit), "example", " WHERE ROWINDEX BETWEEN 100 AND 200")
 
-def testLearning():
-    db = ScDBController("a.db")
-    proc = ScLearningPreprocessor()
-    cols = ["true air speed", "ambient pressure", "ambient temperature", "angle of attack", "current weight"]
-    constraint = "abs({b}-{a})/{b}<0.01"
-    constraintVar = {'a':"lift", 'b':"current weight"}
-    orderandlimit = "{a}"
-    orderandlimitVar = {'a':'total time'}
-    units = ["m/s","pascal","kelvin","radian","newton"]
-    proc.loadDataSet(db, "example", cols, constraint, constraintVar, orderandlimit, orderandlimitVar,units)
-    X = proc.makeTrainingData(toX)
-    Y = proc.makeTargetValue(toY)
-    model = sklearn.linear_model.LinearRegression()
-    model.fit(X,Y)
-    print model.coef_[0][0],model.coef_[0][1]
-    Cl_predicted = model.predict(X)
-    plt.plot(np.linspace(0,Y.shape[0],Y.shape[0]), (Cl_predicted - Y).tolist())
-    plt.show()
-    W_predicted = np.multiply(Cl_predicted, proc.execute(estimateW))
-    W = proc.execute(transform)[0]
-    plt.plot(np.linspace(0,Y.shape[0],Y.shape[0]), (W_predicted).tolist())
-    plt.plot(np.linspace(0,Y.shape[0],Y.shape[0]), (W).tolist())
-    plt.show()
+from sklearn.linear_model import BayesianRidge, LinearRegression
+db = ScDBController("b.db")
+proc = ScLearningPreprocessor()
+cols = ["true air speed","altitude msl", "angle of attack", "current weight"]
+units = ["m/s","meter","radian","newton"]
+constraint = "abs({b}-{a})/{b} < 0.02"
+constraintVar = {'a':"lift","b":"current weight"}
+orderandlimit = "{a}"
+orderandlimitVar = {'a':'total time'}
+proc.loadDataSet(db, "example", cols, constraint, constraintVar, orderandlimit, orderandlimitVar, units)
+X = proc.makeTrainingData(toX)
+Y = np.array(proc.makeTargetValue(toY).transpose().tolist()[0])
+#Y = proc.makeTargetValue(toY)
+# preprocess training data
+X = sklearn.preprocessing.scale(X)
+model = sklearn.linear_model.LinearRegression()
+model.fit(X,Y)
+Cl = np.asmatrix(model.predict(X)).transpose()
+V,H,A,W = proc.execute(toW)
+rho = 4.174794718087996e-11*np.power((288.14-0.00649*H),4.256)
+L = 0.5*np.multiply(np.multiply(rho,np.power(V,2)),Cl)*61
 
-def t1():
-    db = ScDBController("b.db")
-    proc = ScLearningPreprocessor()
-    cols = ["true air speed","altitude msl", "angle of attack", "current weight"]
-    units = ["m/s","meter","radian","newton"]
-    constraint = "abs({b}-{a})/{b} < 0.02"
-    constraintVar = {'a':"lift","b":"current weight"}
-    orderandlimit = "{a}"
-    orderandlimitVar = {'a':'total time'}
-    proc.loadDataSet(db, "example", cols, constraint, constraintVar, orderandlimit, orderandlimitVar, units)
-    X = proc.makeTrainingData(toX)
-    Y = proc.makeTargetValue(toY)
-    model = sklearn.linear_model.LinearRegression(normalize=True)
-    model.fit(X,Y)
-    print model.score(X,Y)
-    Cl = model.predict(X)
-    plt.plot(np.linspace(0, Y.shape[0], Y.shape[0]), Y.tolist())
-    plt.plot(np.linspace(0, Y.shape[0], Y.shape[0]), Cl.tolist())
-    plt.show()
-    V,H,A,W = proc.execute(toW)
-    rho = 4.174794718087996e-11*np.power((288.14-0.00649*H),4.256)
-    L = 0.5*np.multiply(np.multiply(rho,np.power(V,2)),Cl)*61
-    plt.plot(np.linspace(0,Y.shape[0],Y.shape[0]), L.tolist())
-    plt.plot(np.linspace(0,Y.shape[0],Y.shape[0]), W.tolist())
-    plt.show()
-# # load testing data
-# db = ScDBController("c.db")
-# db.connect()
-# db.parse(parser=ScDBParser(csvFileParser), fileName="testingdata.csv", delimiter=",", tableName="example")
-# db.setColumnInfo(tableName="example",fileName="conf.ini")
-# db.close()
-t1()
+print sum(np.power(L-W,2))/L.shape[0]
+print sum(np.power(np.asmatrix(Y).transpose()-Cl,2))/Y.shape[0]
+plt.figure(1)
+plt.subplot(121)
+plt.scatter(np.linspace(0,Y.shape[0],Y.shape[0]), L.tolist(), marker='x')
+plt.scatter(np.linspace(0,Y.shape[0],Y.shape[0]), W.tolist(), marker='o', facecolors='none')
+
+plt.subplot(122)
+plt.scatter(np.linspace(0,Y.shape[0],Y.shape[0]), Y.tolist(), marker='x')
+plt.scatter(np.linspace(0,Y.shape[0],Y.shape[0]), Cl.tolist(), marker='o', facecolors='none')
+plt.show()
+

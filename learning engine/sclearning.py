@@ -13,6 +13,7 @@ import time
 import datetime
 import sklearn.svm
 import matplotlib.pyplot as plt
+import re
 from pint import UnitRegistry
 
 def _convert(matrix, inputUnit, outputUnit):
@@ -27,11 +28,78 @@ def unitConvert(dataSet, inputUnits, outputUnits):
         if (inputUnits[i] and inputUnits[i] != outputUnits[i]):
             dataSet[:,i] = _convert(dataSet[:,i], inputUnits[i], outputUnits[i])
 
-class ScLearningPreprocessor():
+class LearnPreprocessor():
+    # load file/database/etc to memory for learning model to run
     def __init__(self):
-        self.training = None
-        self.target = None
-        pass
+        self.feature_equation = None
+        self.label_equation = None
+        self.feature_var = []
+        self.label_var = {}
+        self.feature = None
+        self.label = None
+        self.cols = {}
+        self.regex = re.compile('\{[0-9A-Za-z]+\}')
+    def setfeature(self, equation_list):
+        self.feature_equation = equation_list
+        for equation in equation_list:
+            current_obj = {}
+            for i in self.regex.findall(equation):
+                current_obj[i[1:-1]] = ""
+            self.feature_var.append(current_obj)
+        
+    def setlabel(self, equation):
+        self.label_equation = equation
+        for i in self.regex.findall(equation):
+            self.label_var[i[1:-1]] = ""
+    def load(self, database, table, requested_values, constraint_formula, constraint_values, size):
+        database.connect()
+        col_names = []
+        col_units = []
+        requested_units = []
+        constraint_pairs = {}
+        for i in requested_values:
+            item = requested_values[i]
+            if not item['isnumber']:
+                info = database.queryColumnInfoByName(item['value'], True)[0]
+                col_names.append(info[0])
+                col_units.append(info[2])
+                item['value'] = info[0]
+                requested_units.append(item['unit'])
+        for i in constraint_values:
+            item = constraint_values[i]
+            if not item['isnumber']:
+                info = database.queryColumnInfoByName(item['value'], True)[0]
+                col_names.append(info[0])
+                item['value'] = info[0]
+            constraint_pairs[i] = '"' + item['value'] + '"'
+        data = np.array(database.queryDataByConstraintAndOrder(table, col_names, "%s limit %d"%(constraint_formula.format(**constraint_pairs), size)))
+        database.close()
+        unitConvert(data, col_units, requested_units)
+        for i in xrange(len(col_names)):
+            self.cols[col_names[i]] = i
+        self.dataset = data
+        # make feature 
+        self.feature = np.ones((self.dataset.shape[0], len(self.feature_var)))
+        for one_feature_index in xrange(len(self.feature_var)):
+            one_feature = self.feature_var[one_feature_index]
+            for i in one_feature:
+                if requested_values[i]['isnumber']:
+                    one_feature[i] = requested_values[i]['value']
+                else:
+                    one_feature[i] = 'self.dataset[:,%d]'%self.cols[requested_values[i]['value']]
+                print self.feature_equation[one_feature_index].format(**one_feature)
+                self.feature[:,one_feature_index] = eval(self.feature_equation[one_feature_index].format(**one_feature)) # it's dangerous to do this, use ast manipulation to revise this later
+        # make label
+        for i in self.label_var:
+            if requested_values[i]['isnumber']:
+                self.label_var[i] = requested_values[i]['value']
+            else:
+                self.label_var[i] = 'self.dataset[:,%d]'%self.cols[requested_values[i]['value']]
+        self.label = eval(self.label_equation.format(**self.label_var)) # it's dangerous to do this, use ast manipulation to revise this later
+        plt.scatter(self.feature, self.label)
+        plt.show()
+        np.savetxt("feature.csv",self.feature, delimiter=',')
+        np.savetxt("label.csv",self.label, delimiter=',')
     def loadDataSet(self, database, tableName, columnNames,constraint, constraintColumnNames, order, orderColumnNames, outputUnits):
         database.connect()
         qcol = []
@@ -47,6 +115,36 @@ class ScLearningPreprocessor():
         for i in orderColumnNames:
             ordercol[i] = '"'+(database.queryColumnInfoByName(orderColumnNames[i],True)[0][0])+'"'
         A = np.matrix(database.queryDataByConstraintAndOrder(tableName ,qcol, constraint.format(**wherecol), order.format(**ordercol)))
+        for i in xrange(len(qcol)):
+            self.cols[qcol[i]] = i
+        unitConvert(A, units, outputUnits)
+        self.dataSet = A
+        database.close()
+        return self.dataSet
+
+class ScLearningPreprocessor():
+    def __init__(self):
+        self.training = None
+        self.target = None
+        self.dataSet = None
+        self.cols = None
+    def loadDataSet(self, database, tableName, columnNames,constraint, constraintColumnNames, order, orderColumnNames, outputUnits):
+        database.connect()
+        qcol = []
+        wherecol = {}
+        ordercol = {}
+        units = []
+        for i in columnNames:
+            result = database.queryColumnInfoByName(i, True)
+            qcol.append(result[0][0])
+            units.append(result[0][2])
+        for i in constraintColumnNames:
+            wherecol[i] = '"'+(database.queryColumnInfoByName(constraintColumnNames[i],True)[0][0])+'"'
+        for i in orderColumnNames:
+            ordercol[i] = '"'+(database.queryColumnInfoByName(orderColumnNames[i],True)[0][0])+'"'
+        A = np.matrix(database.queryDataByConstraintAndOrder(tableName ,qcol, constraint.format(**wherecol), order.format(**ordercol)))
+        for i in xrange(len(qcol)):
+            self.cols[qcol[i]] = i
         unitConvert(A, units, outputUnits)
         self.dataSet = A
         database.close()
@@ -109,7 +207,7 @@ class ScDBController(object):
         result = self.connection.cursor().execute(q)
         self.connection.commit()
         return result
-    def queryDataByConstraintAndOrder(self, table, columns, constraint, order):
+    def queryDataByConstraintAndOrder(self, table, columns, constraint=None, order=None):
         if type(columns) is list:
             select = ""
             for i in columns:
@@ -126,7 +224,12 @@ class ScDBController(object):
         query = s + f + w + o
         if self.DEBUG:
             print query
-        return self.connection.cursor().execute(query).fetchall()
+        result = None
+        try:
+            result = self.connection.cursor().execute(query).fetchall()
+            return result
+        except sqlite3.OperationalError as e:
+            raise type(e)(e.message + "\nError Query: " + query)
 
     def _readConf(self, fileName, tableName):
         reader = csv.reader(filter(lambda(x): bool(x.strip()) and (bool(x.strip()) and x[0] != ';'), open(fileName,"rU").readlines()), delimiter='|')

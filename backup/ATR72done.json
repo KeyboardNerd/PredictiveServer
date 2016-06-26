@@ -1,7 +1,0 @@
-{"columns": [{"key": 0, "type": "speed", "name": "speed", "unit": "meter per second"},
-            {"key": 1, "type": "pressure", "name":"pressure","unit":"Pascal"},
-            {"key": 2, "type":"temperature","name":"temperature","unit":"Kelvin"},
-            {"key": 3, "type":"angle","name":"angle","unit":"radian"},
-            {"key": 4, "type":"force","name":"weight","unit":"newton"}
-            ]
-          }
