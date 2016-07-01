@@ -1,10 +1,14 @@
-import compiler 
+import compiler
+import pickle
 import json
 from sclearning import *
 from sklearn.linear_model import LinearRegression
 from sklearn.naive_bayes import GaussianNB
+import pickle
+
 MODELS = {}
 INSTANCE = {}
+ESTIMATORS = {}
 DBNAME = 'b.db'
 
 class LearnWrapper():
@@ -15,9 +19,8 @@ class LearnWrapper():
         self.p.load(ScDBController(DBNAME), obj, values, constraint_formula, constraint_vars, size)
         self.l.fit(self.p.feature, self.p.label)
     def predict(self, point):
-        return self.l.predict(np.matrix(point))
+        return self.l.predict(np.asmatrix(point))
 
-# first support single instance of learning model running
 def is_number(string):
     try:
         float(string)
@@ -102,9 +105,9 @@ def parse(json_string):
         constraint = parse_equation(json_dict['CONSTRAINT'])
         size = json_dict['size']        
         pipeline.fit( obj_name, values, constraint[0], constraint[1], size)
-        
+        ESTIMATORS[json_dict['ID']] = pipeline.l
     elif json_dict['MODE'] == 2:
-        pipeline = INSTANCE[json_dict['ID']]
+        pipeline = ESTIMATORS[json_dict['ID']]
         #print pipeline.predict(parse_predict_equation(json_dict["VALUES"]))
         return pipeline.predict(json_dict["VALUES"])
 
@@ -121,10 +124,33 @@ def histo_plot( data):
     (mu, sigma) = norm.fit(data)
     # the histogram of the data
     n, bins, patches = plt.hist(data, 30, normed=1, facecolor='green', alpha=0.75)
-
     # add a 'best fit' line
     y = mlab.normpdf( bins, mu, sigma)
     l = plt.plot(bins, y, 'r--', linewidth=2)
+import os
+def save_estimator(dir_name):
+    requested_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), dir_name)
+    if not os.path.exists(requested_dir):
+        os.mkdir(requested_dir)
+    header = open(os.path.join(requested_dir, "header"), "w+")
+    header_dict = {}
+    for i in ESTIMATORS:
+        f = open(os.path.join(requested_dir, str(i)+'.estimator'), 'w+b')
+        pickle.dump(INSTANCE[i].l, f)
+        header_dict[i] = str(i)+'.estimator'
+        f.close()
+    header.write(json.dumps(header_dict))
+    header.close()
+def load_estimator(dir_name):
+    requested_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), dir_name)
+    if not os.path.exists(requested_dir):
+        raise Exception("requested directory is not found")
+    # read header
+    header_dict = json.load(open(os.path.join(requested_dir, "header")))
+    for i in header_dict:
+        ESTIMATORS[int(i)] = pickle.load(open(os.path.join(requested_dir, header_dict[i]), 'rb'))
+    return ESTIMATORS
+                        
 if __name__ == '__main__':
     register_model("My regression 1", LinearRegression())
     register_model("Bayesian", GaussianNB())
@@ -141,5 +167,6 @@ if __name__ == '__main__':
     parse(model_define_string2)
     parse(training_string_db2)
     parse(predict_string2)
-
+    save_estimator("test")
+    load_estimator("test")[0].predict(0.02234021)
 #    query.append(json.dumps({'MODE':2, 'ID':1, 'VALUES':X1}))

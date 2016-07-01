@@ -1,3 +1,7 @@
+transformer:
+defines how to transform the feature, label data to desired data format
+optimizer:
+defines how to 
 model string: (MODE 0)
 define 1. which learning model to be used, 2. what preprocessing will be took
 FEATURE: list of strings: how to compute each feature

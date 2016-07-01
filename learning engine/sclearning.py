@@ -218,8 +218,6 @@ class ScDBParser(object):
         if externalConnection == None:
             connection.close()
     
-
-    
 class PILOTSFileWriter(object):
     """docstring for PILOTSDataWriter"""
     DEBUG = False
