@@ -30,6 +30,7 @@ class Transformer():
         return json.dumps({'equation_list':self.equation_list})
     def fromJSONObject(self, json_object):
         self.equation_list = json_object['equation_list']
+
 class Estimator():
     def __init__(self, predictor, transformer):
         self.predictor = predictor
@@ -145,7 +146,7 @@ def parse(json_string):
 
 def register_model(name, model):
     global MODELS
-    MODELS[name] = model    
+    MODELS[name] = model
 
 def histo_plot( data):
     import matplotlib.pyplot as plt
@@ -159,6 +160,7 @@ def histo_plot( data):
     # add a 'best fit' line
     y = mlab.normpdf( bins, mu, sigma)
     l = plt.plot(bins, y, 'r--', linewidth=2)
+
 import os
 def save_estimator(dir_name):
     requested_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), dir_name)
@@ -179,6 +181,7 @@ def save_estimator(dir_name):
 
 def find_feature(id):
     return ESTIMATORS[id].transformer.get_features()
+
 def load_estimator(dir_name):
     requested_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), dir_name)
     if not os.path.exists(requested_dir):
@@ -187,8 +190,10 @@ def load_estimator(dir_name):
     header_dict = json.load(open(os.path.join(requested_dir, "header")))
     for i in header_dict:
         predictor = pickle.load(open(os.path.join(requested_dir, header_dict[i]+'.predictor'), 'rb'))
+        print "loaded predictor: " + str(predictor)
         transformer = Transformer(json_object=json.load(open(os.path.join(requested_dir, header_dict[i]+'.transformer'), 'r')))
         ESTIMATORS[int(i)] = Estimator(predictor, transformer)
+        
     return ESTIMATORS
 
 # need to refactor that it's MVC structure
@@ -197,7 +202,7 @@ if __name__ == '__main__':
     register_model("Bayesian", GaussianNB())
     # every instance of learning model can only have one model, feature and label definition
     model_define_string = '{"MODE": 0, "ID":0, "MODEL":"My regression 1", "FEATURE":["{aoa}"], "LABEL":"2*{W}/({V}**2*{S}*(4.174794718087996e-11*(288.14-0.00649*{H})**4.256))"}'
-    training_string_db = '{"MODE": 1, "ID": 0, "OBJECT":"example", "size":1000,"DATA":"aoa=angle of attack(radian),  W=current weight(N), V=true air speed(m/s), S=61.0(m^2), H=altitude msl(m)","CONSTRAINT": "abs({b}-{a})/{a}<0.01, b=lift(N), a = current weight(N)"}'
+    training_string_db = '{"MODE": 1, "ID": 0, "OBJECT":"example", "size":1000,"DATA":"aoa=angle of attack(radian),  W=current weight(N), V=true air speed(m/s), S=61.0(m^2), H=altitude msl(m)","CONSTRAINT": "abs({b}-{a})/{a}<0.05, b=lift(N), a = current weight(N)"}'
     predict_string = '{"MODE": 2, "ID": 0, "VALUES":"aoa=0.02234021"}'
     parse(model_define_string)
     parse(training_string_db)
@@ -207,6 +212,9 @@ if __name__ == '__main__':
     predict_string2 = '{"MODE": 2, "ID": 1, "VALUES":"b=2,a=1"}'
     parse(model_define_string2)
     parse(training_string_db2)
+    model = MODELS["My regression 1"]
+    model.coef_ = 6.27203070470782986234
+    model.intercept_ = 0.35713086960224765809
     save_estimator("test")
     load_estimator("test")
     print parse(predict_string2)

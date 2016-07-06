@@ -180,7 +180,6 @@ class ScDBController(object):
             result.append(map(str.strip, i) + [tableName])
         return result
 
-
 class ScDBParser(object):
     DEBUG = False
     def __init__(self, parser=None):
