@@ -3,6 +3,7 @@ from pint import UnitRegistry
 from sklearn.linear_model import LinearRegression
 import matplotlib.pyplot as plt
 import re
+import bayes
 import pickle
 
 class BaseEnv():
@@ -27,25 +28,15 @@ class BaseEnv():
             head = header
         for i in xrange(len(head)):
             self.variable_dict[head[i]] = {'index': i}
-        self.cached_data = raw_data
+        return raw_data
 
-    def append_cached_data(self):
+    def append_data(self, data):
         if self.data:
-            self.data = self.data.vstack(self.cached_data)
+            self.data = self.data.vstack(data)
         else:
-            self.data = self.cached_data.copy()
-    def cache_data(self):
-        self.cached_data = self.data.copy()
-    def set_cached_data(self, *args):
-        # set cached data according to args, if args is None, then copy the cached data
-        if not args:
-            self.data = self.cached_data.copy()
-        else:
-            for i in args:
-                setattr(self, i, self.cached_data[i].copy())
-
-    def get_cached_data(self):
-        return self.cached_data.copy()
+            self.data = data.copy()
+    def set_data(self, data):
+        self.data = data.copy()
 
     def set_constant(self, **constants):
         self.constant_dict.update(constants)
@@ -126,14 +117,26 @@ class BaseEnv():
         Y = np.apply_along_axis(label_transformer, 1, npmatrix)
         return {'label': Y, 'feature': X}
     def train_estimator(self,estimator):
-        return estimator.fit(self.feature, self.label)
+        estimator.fit(self.feature, self.label)
+        return estimator
+
 
 def save_estimator(filename, estimator, features, constants):
     pickle.dump((estimator, features, constants),open(filename, 'w+b'))
+
 def load_estimator(filename):
     estimator, features,constants = pickle.load(open(filename, 'rb'))
     return (estimator, features, constants)
-def testBaseEnv():
+
+def save_bayes(filename, estimator, features, constants):
+    estimator_json = estimator.to_json()
+    pickle.dump((estimator_json, features, constants), open(filename, 'w+b'))
+def load_bayes(filename):
+    estimator_json, features, constants = pickle.load(open(filename, 'rb'))
+    estimator = bayes.Bayes()
+    estimator.load_json(estimator_json)
+    return (estimator, features, constants)
+def generate_linearRegression():
     units = ['knot', 'in_Hg', 'celsius', 'degree', 'force_pound']
     tounits = ['m/s', 'pascal', 'kelvin', 'radian', 'newton']
     name = ['v','p','t','a','w']
@@ -158,8 +161,24 @@ def testBaseEnv():
     features = ['{aoa}']
     for i in xrange(1):
         estimator.predict(np.apply_along_axis(BaseEnv.generate_transformer(features, schema, {}), 1, input_data))
-    save_estimator("test.estimator", estimator, features, env.constant_dict)
-    load_estimator("test.estimator")
+    save_estimator("linearRegression.estimator", estimator, features, env.constant_dict)
+    load_estimator("linearRegression.estimator")
 
+def generate_Bayes():
+    name = ['a','b','type']
+    env = BaseEnv()
+    pilotfile = lambda(row): map(float, row.split(':')[-1].split(','))
+    pilot_header = lambda(row): map(lambda(word): word.strip(), row[1:].split(','))
+    data = env.load_file("data/bayes_training.txt", pilotfile, pilot_header, header=name)
+    env.append_data(data)
+    cached_data = env.transform(env.feature_label_transformer, schema=env.get_schema_info(), constant=env.get_constant(), features=['{b}/{a}'], labels=["{type}"])
+    env.label = cached_data['label']
+    env.feature = cached_data['feature']
+    estimator = env.train_estimator(bayes.Bayes())
+    data = env.load_file('data/bayes_testing.txt', pilotfile, pilot_header, header=name)
+    transformer = BaseEnv.generate_transformer(feature_list=['{b}/{a}'], schema=env.get_schema_info(), constant=env.get_constant())
+    save_bayes("bayes.estimator", estimator, ['{b}/{a}'], env.constant_dict)
+    (estimator, features, constants) = load_bayes("bayes.estimator")
+    print estimator.predict(np.asmatrix(np.apply_along_axis(transformer, 1, data)))
 if __name__ == '__main__':
-    testBaseEnv()
+    generate_Bayes()

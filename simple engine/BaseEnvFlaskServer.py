@@ -2,14 +2,14 @@ from BaseEnv import *
 from flask import Flask
 from flask import request
 import numpy as np
-file_name = "test.estimator"
+file_name = "bayes.estimator"
 app = Flask(__name__)
 
 ESTIMATOR = {}
 LAMBDA_CALCULATOR = {}
 SCHEMA = {}
 CONSTANT = {}
-estimator, features, constant = load_estimator(file_name)
+estimator, features, constant = load_bayes(file_name)
 ESTIMATOR['0'] = (estimator, features, constant)
 CONSTANT['0'] = {'s':61.0}
 def accept_schema(request, model, estimator_dict, schema_dict, lambda_dict):
@@ -29,7 +29,7 @@ def accept_schema(request, model, estimator_dict, schema_dict, lambda_dict):
         schema_dict[model]['schema'] = current_schema
         schema_dict[model]['name'] = request.args['name']
         lambda_dict[model] = BaseEnv.generate_transformer(features, schema_dict[model]['schema'], constant)
-        print "lambda expression updated!"
+        print "lambda expression updated! "
 @app.route("/")
 def hello():
     model = request.args['model']
@@ -38,4 +38,5 @@ def hello():
     accept_schema(request, model, ESTIMATOR, SCHEMA, LAMBDA_CALCULATOR)
     feature_transformer = LAMBDA_CALCULATOR[model]
     X = np.apply_along_axis(feature_transformer, 1, data)
-    return str(estimator.predict(X))[2:-2]
+    print X
+    return str(estimator.predict(X))
