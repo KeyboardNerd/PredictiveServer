@@ -38,5 +38,5 @@ def hello():
     accept_schema(request, model, ESTIMATOR, SCHEMA, LAMBDA_CALCULATOR)
     feature_transformer = LAMBDA_CALCULATOR[model]
     X = np.apply_along_axis(feature_transformer, 1, data)
-    print X
+    print 'to predict =' + str(X)
     return str(estimator.predict(X))

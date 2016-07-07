@@ -179,6 +179,8 @@ def generate_Bayes():
     transformer = BaseEnv.generate_transformer(feature_list=['{b}/{a}'], schema=env.get_schema_info(), constant=env.get_constant())
     save_bayes("bayes.estimator", estimator, ['{b}/{a}'], env.constant_dict)
     (estimator, features, constants) = load_bayes("bayes.estimator")
-    print estimator.predict(np.asmatrix(np.apply_along_axis(transformer, 1, data)))
+    #print estimator.predict(np.asmatrix(np.apply_along_axis(transformer, 1, data)))
+    print
+    print estimator.predict(np.asmatrix([[0.2]]))
 if __name__ == '__main__':
     generate_Bayes()
