@@ -233,7 +233,7 @@ class Bayes(object):
                 else:
                     item_state = self.create_minor_state(item)
                     output_type.append(item_state)
-        return np.asmatrix(output_type)
+        return np.asmatrix(output_type).transpose()
 
     def training(self, input_data, input_type):
         # Training data: a and b

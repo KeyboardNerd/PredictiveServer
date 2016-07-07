@@ -7,6 +7,7 @@ import bayes
 import pickle
 
 class BaseEnv():
+    ''' class BaseEnv provides basic access of loading,training functions for machine learning'''
     def __init__(self):
         self.constant_dict = {}
         self.variable_dict = {}
@@ -16,6 +17,14 @@ class BaseEnv():
         self.cached_data = None
 
     def load_file(self, file_name, map_method, header_method=None, header=None):
+        '''
+            @return: returns a matrix of data contained in file with name "file_name"
+            @effect: clean and set self.variable_dict to column information 
+            @parameters: file_name( string, name of the file want to load )
+                         map_method( function with one parameter, this will be mapped to each line in file body. It should retrun an array-like )
+                         header_method( function with one parameter, this will be used for parsing first line (header) in the file. If it's None, then we assume that the file contains no header)
+                         header ( list of string, header contains the semantic meaning of each column in returend matrix)
+        '''
         raw = open(file_name,'rU').readlines()
         head = None
         start = 0
@@ -26,27 +35,57 @@ class BaseEnv():
         raw_data = np.asmatrix(map(map_method, body))
         if header:
             head = header
+        self.variable_dict = {}
         for i in xrange(len(head)):
             self.variable_dict[head[i]] = {'index': i}
         return raw_data
 
     def append_data(self, data):
+        '''
+            @effect: vertically stack data to the end of self.data, if self.data is empty, then data will be copied into self.data
+            @parameters: data(numpy ndarray)
+            @require: self.data and data's column dimension should match
+        '''
         if self.data:
             self.data = self.data.vstack(data)
         else:
             self.data = data.copy()
+
+
     def set_data(self, data):
+        '''
+            @effect: self.data is set to copy of data
+            @param: data(numpy ndarray)
+        '''
         self.data = data.copy()
 
     def set_constant(self, **constants):
+        '''
+            @effect: add constant_dict with the key value pairs defined in constants
+            @param: constants(dictionary, the key value pairs to be added to self.constant_dict)
+        '''
         self.constant_dict.update(constants)
 
+
     def update_variable_info(self, **info):
+        '''
+            @effect: update key value pairs stored in self.variable_dict
+            @param: info(dictionary, key value pairs to be used to update self.variable_dict)
+        '''
         for key in info:
             self.variable_dict[key].update(info[key])
+
     def get_constant(self):
+        '''
+            @return: copy of self.constant_dict
+        '''
         return self.constant_dict.copy()
+
     def get_schema_info(self, *columns):
+        '''
+            @return: the requested {key: value} for each value stored in self.variable_dict[key]
+            @param: columns( list of string, list of requested keys )
+        '''
         if not columns:
             return self.variable_dict.copy()
         else:
@@ -56,7 +95,12 @@ class BaseEnv():
                 for value_key in columns:
                     result[key][value_key] = self.variable_dict[key][value_key]
             return result
+
     def get_columns_info(self, *columns):
+        '''
+            @return: a list of dictionaries representing the semantic meaning of corresponding column in matrix
+            @param: requested columns, @seealso get_schema_info
+        '''
         result = [0]*len(self.variable_dict)
         for key in self.variable_dict:
             if not columns:
@@ -75,10 +119,20 @@ class BaseEnv():
         return result
 
     def transform(self, transformer, **parameters):
-        # a transformer is a function transform and return modified data
+        '''
+            @return: return value in transformer
+            @param: transformer( a function with parameter(self.data), parameters )
+                    parameters( a dictionary of parameters required in transformer)
+        '''
         return transformer(self.data, **parameters)
+
     @staticmethod
     def unit_transformer(npmatrix, **parameters):
+        '''
+            @return: return a numpy matrix, which is the matrix with converted unit
+            @param: npmatrix( a ndarray )
+                    parameters (dictionary with at least fields "schema", "units", schema is schema_info defined in Env, including origin units, units is a dictionary with key in schema, representing the result unit)
+        '''
         schema = parameters['schema']
         tounits = parameters['units']
         data = npmatrix.copy()
@@ -90,8 +144,15 @@ class BaseEnv():
             tounit = tounits[i]
             data[:,index] = Q_(data[:,index], unit).to(tounit).magnitude
         return data
+
     @staticmethod
     def generate_transformer(feature_list, schema, constant):
+        '''
+            @return lambda expression which will transform a matrix/ndarray/array-like to np.array. Every element is defined by feature_list
+            @param: feature_list(list of special string: each string contains '{var}' to identify var as a variable, and each string complies to python grammar)
+                    schema ( dictionary of schematic meaning representing each column of the matrix/ndarry to be transformed)
+                    constant ( dictionary of var: number, representing the constants involved in the feature_list)
+        '''
         def position_lookup(requested_name, schema, constant, matrix_name):
             if requested_name in schema:
                 return {requested_name: "%s[%d]"%(matrix_name, schema[requested_name]['index'])}
@@ -108,79 +169,63 @@ class BaseEnv():
             string.append(feature_list[i].format(**string_vars[i]))
         transformer = eval('lambda(x): np.asarray(['+reduce(lambda a,b: a+','+b, string)+'])')
         return transformer
+
+
     @staticmethod
     def feature_label_transformer(npmatrix, **parameters):
+        '''
+            first it generates label, feature transformer based on parameters and apply the transformer to each row in npmatrix
+            @return a dictionary with {"label": label matrix, "feature": feature matrix}        
+            @param: npmatrix( ndarray, the data to be transformed )
+                    parameters: ( dictionary with required fields: schema (the schema of npmatrix), constant (constant used in feature,label transformation), features (a list of string defining the transformer ), labels ( a list of string defining the transformer ) )                    
+        '''
         schema = parameters['schema']; constant = parameters['constant']; features=parameters['features']; labels=parameters['labels']
         feature_transformer = BaseEnv.generate_transformer(features, schema, constant)
         label_transformer = BaseEnv.generate_transformer(labels, schema, constant)
         X = np.apply_along_axis(feature_transformer, 1, npmatrix)
         Y = np.apply_along_axis(label_transformer, 1, npmatrix)
         return {'label': Y, 'feature': X}
+
+
     def train_estimator(self,estimator):
+        '''
+            train a estimator, which has function fit(feature, label) for training the estimator
+            @return a trained estimator
+            @param: estimator(a class/module with function fit(feature, label) for training itself)
+        '''
         estimator.fit(self.feature, self.label)
         return estimator
 
 
-def save_estimator(filename, estimator, features, constants):
+def save_estimator(filename, estimator, features, constants, to_json=False):
+    '''
+        save one estimator, estimator feature transformer list, constants to a pickle binary file
+        @param: filename ( string, the file name)
+                estimator ( scikit model, trained estimator )
+                features ( list of strings, defining how to compute input matrix from raw matrix)
+                constants ( dictionary of string: number pair, the values used in features if it appears as constant)
+                to_json ( call to_json function in estimator to save the serialized version of estimator)
+        @effect: create or replace a file named filename, containing information about estimator, features and constants, which can be retrieved by pickle.load
+    '''
+    if to_json:
+        estimator = estimator.to_json()
     pickle.dump((estimator, features, constants),open(filename, 'w+b'))
 
-def load_estimator(filename):
-    estimator, features,constants = pickle.load(open(filename, 'rb'))
+def load_estimator(filename, to_json=False, estimator_initializer=None):
+    '''
+        load an estimator, estimator feature transformer, constants from file with name filename
+        @param: filename (string, the file name)
+                to_json (bool, is the estimator a json string?)
+                estimator_initializer (function, should we initialize a instance of estimator and load json file?)
+        @return: a tuple containing estimator, estimator feature transformer list, constants
+    '''
+    estimator_json, features,constants = pickle.load(open(filename, 'rb'))
+    if to_json and estimator_initializer:
+        estimator = estimator_initializer()
+        estimator.load_json(estimator_json)
+    else:
+        estimator = estimator_json
     return (estimator, features, constants)
 
-def save_bayes(filename, estimator, features, constants):
-    estimator_json = estimator.to_json()
-    pickle.dump((estimator_json, features, constants), open(filename, 'w+b'))
-def load_bayes(filename):
-    estimator_json, features, constants = pickle.load(open(filename, 'rb'))
-    estimator = bayes.Bayes()
-    estimator.load_json(estimator_json)
-    return (estimator, features, constants)
-def generate_linearRegression():
-    units = ['knot', 'in_Hg', 'celsius', 'degree', 'force_pound']
-    tounits = ['m/s', 'pascal', 'kelvin', 'radian', 'newton']
-    name = ['v','p','t','a','w']
-    env = BaseEnv()
-    csvfile = lambda(row): map( float, row.split(','))
-    csvfile_header = lambda(row): map( lambda(word): word.strip(), row.split(','))
-    pilotfile = lambda(row): map(float, row.split(':')[-1].split(','))
-    pilot_header = lambda(row): map(lambda(word): word.strip(), row[1:].split(','))
-    env.load_file("thetrain.csv", csvfile, csvfile_header, header=['v','p','t','a','w'])
-    env.append_cached_data()
-    env.set_constant(s=61.0)
-    env.update_variable_info(v={'unit': 'knot'}, p={'unit': 'in_Hg'}, t={'unit': 'celsius'}, a={'unit': 'degree'}, w={'unit': 'force_pound'})
-    cached_data = env.transform(env.unit_transformer, schema=env.get_schema_info(), units=dict(v='m/s',a='radian',w='newton',t='kelvin',p='pascal'))
-    env.data = cached_data.copy()
-    cached_data = env.transform(env.feature_label_transformer, schema=env.get_schema_info(), constant=env.get_constant(), features=["{a}"], labels=["2*{w}/({v}**2*({p}/286.9/{t})*{s})"])
-    env.label = cached_data['label']
-    env.feature = cached_data['feature']
-    estimator = env.train_estimator(LinearRegression())
-    # for estimation, the input should be: schematic meaning of the matrix columns, feature transformation method
-    input_data = np.ones((100,1))
-    schema = {'aoa': {'index': 0}}
-    features = ['{aoa}']
-    for i in xrange(1):
-        estimator.predict(np.apply_along_axis(BaseEnv.generate_transformer(features, schema, {}), 1, input_data))
-    save_estimator("linearRegression.estimator", estimator, features, env.constant_dict)
-    load_estimator("linearRegression.estimator")
 
-def generate_Bayes():
-    name = ['a','b','type']
-    env = BaseEnv()
-    pilotfile = lambda(row): map(float, row.split(':')[-1].split(','))
-    pilot_header = lambda(row): map(lambda(word): word.strip(), row[1:].split(','))
-    data = env.load_file("data/bayes_training.txt", pilotfile, pilot_header, header=name)
-    env.append_data(data)
-    cached_data = env.transform(env.feature_label_transformer, schema=env.get_schema_info(), constant=env.get_constant(), features=['{b}/{a}'], labels=["{type}"])
-    env.label = cached_data['label']
-    env.feature = cached_data['feature']
-    estimator = env.train_estimator(bayes.Bayes())
-    data = env.load_file('data/bayes_testing.txt', pilotfile, pilot_header, header=name)
-    transformer = BaseEnv.generate_transformer(feature_list=['{b}/{a}'], schema=env.get_schema_info(), constant=env.get_constant())
-    save_bayes("bayes.estimator", estimator, ['{b}/{a}'], env.constant_dict)
-    (estimator, features, constants) = load_bayes("bayes.estimator")
-    #print estimator.predict(np.asmatrix(np.apply_along_axis(transformer, 1, data)))
-    print
-    print estimator.predict(np.asmatrix([[0.2]]))
-if __name__ == '__main__':
-    generate_Bayes()
+

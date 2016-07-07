@@ -1,17 +1,36 @@
-from BaseEnv import *
+import baseenv as base
+import bayes
 from flask import Flask
 from flask import request
 import numpy as np
-file_name = "bayes.estimator"
-app = Flask(__name__)
 
+
+file_name = 'server.config'
+app = Flask(__name__)
+# globals
+INITIALIZERS = {'bayes': bayes.Bayes}
 ESTIMATOR = {}
 LAMBDA_CALCULATOR = {}
 SCHEMA = {}
 CONSTANT = {}
-estimator, features, constant = load_bayes(file_name)
-ESTIMATOR['0'] = (estimator, features, constant)
-CONSTANT['0'] = {'s':61.0}
+
+def load_config(file_name):
+    import json
+    raw = json.load(open(file_name,'rU'))
+    models = raw['models']
+    for model in models:
+        id_ = model['id']
+        json = model['json']
+        f = model['file_name']
+        init = model['initializer']
+        to_json = f
+        if init:
+            initializer = INITIALIZERS[init]
+        else:
+            initializer = None
+        ESTIMATOR[id_] = base.load_estimator(f, to_json, initializer)
+
+
 def accept_schema(request, model, estimator_dict, schema_dict, lambda_dict):
     estimator, features,constant = estimator_dict[model]
     to_parse = False
@@ -28,8 +47,9 @@ def accept_schema(request, model, estimator_dict, schema_dict, lambda_dict):
             current_schema[name[i]] = {'index': i}
         schema_dict[model]['schema'] = current_schema
         schema_dict[model]['name'] = request.args['name']
-        lambda_dict[model] = BaseEnv.generate_transformer(features, schema_dict[model]['schema'], constant)
+        lambda_dict[model] = base.BaseEnv.generate_transformer(features, schema_dict[model]['schema'], constant)
         print "lambda expression updated! "
+load_config(file_name)
 @app.route("/")
 def hello():
     model = request.args['model']
