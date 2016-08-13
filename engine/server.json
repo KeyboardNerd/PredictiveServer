@@ -1,0 +1,10 @@
+{  
+   "models":[
+      {
+         "id":"linear_regression",
+         "model":"linear_regression.estimator",
+         "translation": {"v_a": "v"},
+         "update": false
+      }
+   ]
+}

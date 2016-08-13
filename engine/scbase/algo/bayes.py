@@ -28,31 +28,38 @@ class State(object):
 
 class Bayes(object):
 
-    def __init__(self):
+    def __init__(self, sigma_scale=2, threshold=100):
         self.data = {}
         self.states = {}
         self.minor_states = {}
         self.total_num = 0
+        self.sigma_scale = sigma_scale
+        self.threshold = threshold
+
+    def __str__(self):
+        return "(Bayes threshold=%d, sigma_scale=%d, num_states=%d, num_minor_states=%d, num_data=%d)"%(self.threshold, self.sigma_scale, len(self.states), len(self.minor_states), self.total_num)
+    def __repr__(self):
+        return self.__str__()
 
     def print_states(self):
         for item in self.states.values():
-            print item.id
-            print item.n
-            print item.mean
-            print item.std
-            print item.sum
-            print item.sqsum
-            print item.prior
+            print 'id',item.id
+            print 'n',item.n
+            print 'mean',item.mean
+            print 'std',item.std
+            print 'sum',item.sum
+            print 'sqsum',item.sqsum
+            print 'prior',item.prior
 
     def print_minor_states(self):
         for item in self.minor_states.values():
-            print item.id
-            print item.n
-            print item.mean
-            print item.std
-            print item.sum
-            print item.sqsum
-            print item.prior
+            print 'id',item.id
+            print 'n',item.n
+            print 'mean',item.mean
+            print 'std',item.std
+            print 'sum',item.sum
+            print 'sqsum',item.sqsum
+            print 'prior',item.prior
 
     # Get the next available state id
     def get_next_id(self):
@@ -92,22 +99,10 @@ class Bayes(object):
         with open(filename, 'w') as outfile:
             outfile.write(output_string)
     def to_json(self):
-        output_string = "{'states':["
-        count = 0
-        for item in self.states.values():
-            output_string += "{'id':" + str(item.id) + ","
-            output_string += "'n':" + str(item.n) + ","
-            output_string += "'mean':" + str(item.mean) + ","
-            output_string += "'std':" + str(item.std) + ","
-            output_string += "'sum':" + str(item.sum) + ","
-            output_string += "'sqsum':" + str(item.sqsum) + ","
-            output_string += "'prior':" + str(item.prior) + "}"
-            count += 1
-            if count < len(self.states):
-                output_string += ","
-        output_string += "]}\r\n"
-        output_string = output_string.replace("'", "\"");
-        return output_string
+        json_dict = {}
+        json_dict['states'] = map(lambda(item): {'id': item.id, 'n': item.n,'mean':item.mean,'std':item.std,'sum':item.sum,'sqsum':item.sqsum,'prior':item.prior}, self.states.values())
+        json_dict['config'] = {'sigma_scale': self.sigma_scale, 'threshold': self.threshold}
+        return json.dumps(json_dict)
 
     def load_json(self, json_string):
         self.states = {}
@@ -123,7 +118,9 @@ class Bayes(object):
             self.states[item_id].sqsum = item["sqsum"]
             self.states[item_id].prior = item["prior"]
             self.total_num += item["n"]
-
+        self.sigma_scale = temp['config']['sigma_scale']
+        self.threshold = temp['config']['threshold']
+        
     def load_training_para(self, filename):
         self.states = {}
         self.total_num = 0
@@ -211,7 +208,6 @@ class Bayes(object):
         # input_data is a numpy column matrix, 
         input_data = input_data.transpose().tolist()[0]
         output_type = []
-        self.print_states()
         for item in input_data:
             if (self.in_major_states(item)):
                 self.total_num += 1
@@ -225,7 +221,7 @@ class Bayes(object):
                     self.minor_states[item_state].update(item)
                     output_type.append(item_state)
                     # If item number in a minor state > 1000, change it to a major state.
-                    if (self.minor_states[item_state].n >= 1000):
+                    if (self.minor_states[item_state].n >= self.threshold):
                         self.states[item_state] = self.minor_states[item_state]
                         del(self.minor_states[item_state])
                         self.total_num += self.states[item_state].n
@@ -233,7 +229,7 @@ class Bayes(object):
                 else:
                     item_state = self.create_minor_state(item)
                     output_type.append(item_state)
-        return np.asmatrix(output_type)
+        return np.asmatrix(output_type).transpose()
 
     def training(self, input_data, input_type):
         # Training data: a and b
@@ -270,15 +266,15 @@ class Bayes(object):
     # Check if the item is within mean +- 3 sigma of any major state
     def in_major_states(self, item):
         for state in self.states.values():
-            if item >= state.mean - 3 * state.std and item <= state.mean + 3 * state.std:
+            if item >= state.mean - self.sigma_scale * state.std and item <= state.mean + self.sigma_scale * state.std:
                 return True
         return False
 
     # Get average value of std divided by mean
-    def avg_std_mean(self):
+    def avg_std(self):
         result = 0.0
         for state in self.states.values():
-            result += state.std/state.mean
+            result += state.std
         return result / len(self.states)
 
     # Check if the item is within mean +- 3 sigma of any minor state
@@ -287,8 +283,8 @@ class Bayes(object):
             est_std = state.std
             # If item in a minor state < 100, use estimated std
             if state.n < 100:
-                est_std = state.mean * self.avg_std_mean()
-            if item >= state.mean - 3 * est_std and item <= state.mean + 3 * est_std:
+                est_std = self.avg_std()
+            if item >= state.mean - self.sigma_scale * est_std and item <= state.mean + self.sigma_scale * est_std:
                 return state.id
         return False
 
@@ -335,7 +331,7 @@ class Bayes(object):
                     self.minor_states[item_state].update(item)
                     output_type.append(item_state)
                     # If item number in a minor state > 1000, change it to a major state.
-                    if (self.minor_states[item_state].n >= 1000):
+                    if (self.minor_states[item_state].n >= self.threshold):
                         self.states[item_state] = self.minor_states[item_state]
                         del(self.minor_states[item_state])
                         self.total_num += self.states[item_state].n
