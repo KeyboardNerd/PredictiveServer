@@ -18,7 +18,9 @@ Service:
 Then simply run at the root directory of the project:
 
 ~~~
-./install.sh
+virtualenv .
+source bin/activate
+pip install -r requirements.txt
 ~~~
 
 ## Quick Start
