@@ -1,10 +1,23 @@
 {  
    "models":[
-      {
-         "id":"linear_regression",
-         "model":"linear_regression.estimator",
-         "translation": {"v_a": "v"},
+      {  
+         "id":"linear",
+         "model":"linearRegression.estimator",
+         "translation": {"aoa": "a"},
          "update": false
+      },
+      {
+        "id":"cruise",
+        "model":"cruise.estimator",
+        "translation": {},
+        "update": false
+      },
+      {
+        "id":"bayes",
+        "model":"bayes_online.estimator",
+        "translation":{"v_a": "v"},
+        "update":true
       }
+
    ]
 }
