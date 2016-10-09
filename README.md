@@ -150,4 +150,3 @@ The response is composed in a json response with the root key `value`, and the v
 * Add support for preprocessing interface
 * Finish implementation of testing trained estimators
 * Change networking protocol
-* Change to virtualenv
