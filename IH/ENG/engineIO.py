@@ -1,14 +1,12 @@
 import json
 import sys
-import time
-import matplotlib.pyplot as plt
-from sklearn.metrics import mean_squared_error
-import numpy as np
-import scbase.baseenv as baseenv
-import scbase.algorithms as algorithms
-import scbase.parser as parser
-from interface.keys import TrainKey as K
-from scbase.model import Model
+
+import LM.RawModel.algorithms as algorithms
+import LM.RawModel.baseenv as baseenv
+import PA.LambdaParser as parser
+from IH.ENG.keys import TrainKey as K
+from LM.RawModel.RawModel import Model
+
 
 def train_model(json_file_name):
 	return _load(json_file_name)
@@ -35,7 +33,7 @@ def read_data(env, json_dict):
 	file_names = json_dict[K.D_FILE]
 	schema = json.load(open(json_dict[K.D_S],'rU'))
 	for i in file_names:
-		data = env.load_file(i, getattr(parser,json_dict[K.D_T]), getattr(parser, json_dict[K.D_HT]), header=schema[K.S_N])
+		data = env.load_file(i, getattr(parser, json_dict[K.D_T]), getattr(parser, json_dict[K.D_HT]), header=schema[K.S_N])
 		env.append_data(data)
 	if K.D_C in json_dict:
 		env.set_constant(**json_dict[K.D_C])

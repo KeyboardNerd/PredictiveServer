@@ -1,9 +1,9 @@
-import scbase.algorithms
-import scbase.model as M
-import numpy as np
 import json
-import scbase.model
-from interface.keys import InterfaceKey as K
+
+import LM.RawModel.RawModel
+import OH.NET.OnlineModel
+from IH.ENG.keys import InterfaceKey as K
+
 
 def makedict(data, schema):
 	if len(data) != len(schema):
@@ -19,7 +19,8 @@ class InterfaceIO(object):
 		models = {}
 		config = {}
 		for model in json_dict:
-			models[model[K.M_ID]] = M.OnlineModel(M.Model.load_file(model[K.M_F], scbase.algorithms), model[K.M_DIC])
+			models[model[K.M_ID]] = OH.NET.OnlineModel.OnlineModel(LM.RawModel.RawModel.Model.load_file(model[K.M_F],
+																										Example.PredictiveServer.engine.scbase.algorithms), model[K.M_DIC])
 			if K.M_UPDATE in model:
 				config[model[K.M_ID]] = ( model[K.M_UPDATE], model[K.M_F] )
 		return (models, config)

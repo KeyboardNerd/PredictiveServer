@@ -1,6 +1,7 @@
-from engineIO import *
-import matplotlib.pyplot as plt
 import csv
+
+from IH.ENG.engineIO import *
+
 env = train_model("definitions/regression_config.json")
 wr = csv.writer(open("regression_label.csv", 'w+'), delimiter=',')
 wr.writerows(env.label.tolist())

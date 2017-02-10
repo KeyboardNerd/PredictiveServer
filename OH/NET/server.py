@@ -1,8 +1,9 @@
+import json
+
 from flask import Flask
 from flask import request
-import numpy as np
-import json
-import InterfaceIO
+
+from OH.NET import InterfaceIO
 
 config = 'server.json'
 app = Flask(__name__)

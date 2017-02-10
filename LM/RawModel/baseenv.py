@@ -2,7 +2,7 @@ import numpy as np
 from pint import UnitRegistry
 import re
 import pickle
-import model
+import Example.PredictiveServer.engine.scbase.model
 
 class BaseEnv():
     ''' class BaseEnv provides basic access of loading,training functions for machine learning'''
