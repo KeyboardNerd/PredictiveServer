@@ -1,8 +1,8 @@
 import csv
 
 from IH.ENG.engineIO import *
-
-env = train_model("definitions/regression_config.json")
+import os
+env = train_model(os.path.abspath("Test/definitions/regression_config.json"))
 wr = csv.writer(open("regression_label.csv", 'w+'), delimiter=',')
 wr.writerows(env.label.tolist())
 wr = csv.writer(open("regression_feature.csv", 'w+'), delimiter=',')
